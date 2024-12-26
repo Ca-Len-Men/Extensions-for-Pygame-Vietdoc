@@ -434,11 +434,13 @@ def check_rotate(node):
     balance = node.get_balance()
 
     if balance > 1:     # Lệch trái
-        if node.left.right is not None and node.right is not None and node.left.right.height > node.right.height:  # Cây con trái lệch phải
+        node_right_height = 0 if node.right is None else node.right.height
+        if node.left.right is not None and node.left.right.height > node_right_height:  # Cây con trái lệch phải
             animation_queue.append(animation_rotate_left(node.left, False))
         animation_queue.append(animation_rotate_right(node, True))
     elif balance < -1:  # Lệch phải
-        if node.right.left is not None and node.left is not None and node.right.left.height > node.left.height:  # Cây con phải lệch trái
+        node_left_height = 0 if node.left is None else node.left.height
+        if node.right.left is not None and node.right.left.height > node_left_height:  # Cây con phải lệch trái
             animation_queue.append(animation_rotate_right(node.right, False))
         animation_queue.append(animation_rotate_left(node, True))
     elif node.parent is not None:
