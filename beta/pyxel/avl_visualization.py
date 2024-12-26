@@ -266,17 +266,17 @@ class AVL:
         return None
 
     def insert(self, key):
-        # Thông báo : nhập giá trị đã tồn tại
-        if self.search(key):
-            self.show_duplicate_message()
-            return
-
         if self.root is None:
             self.root = Node(key, Vector2(WIDTH // 2, 50))
             return
-        
+
         # Play animation tìm kiếm
-        animation_queue.append(self.animation_search(key))
+        animation_queue.append(self.animation_search(key, False))
+
+        # Thông báo : nhập giá trị đã tồn tại
+        if self.search(key):
+            animation_queue.append(AVL.show_duplicate_message())
+            return
 
         # Thêm nút
         self.create_node_and_rotate(key)
@@ -306,10 +306,10 @@ class AVL:
 
         check_rotate(node)
 
-    def animation_search(self, key):
+    def animation_search(self, key, report):
         "Hành động tìm kiếm trên cây nhị phân"
 
-        if not self.root:
+        if self.root is None:
             return
             
         selection = self.root
@@ -322,7 +322,17 @@ class AVL:
                 for _ in animation_pause(0.8):
                     pygame.draw.circle(screen, GREEN, selection.position, 25, 5)
                     yield None
+
+                if report is True:
+                    message = "Đã tìm thấy !"
+                    text = font.render(message, True, RED)
+
+                    for _ in animation_pause(1):
+                        screen.blit(text, Vector2(WIDTH // 2 - text.get_width() // 2, HEIGHT - 100))
+                        yield None
+
                 return
+
             elif selection.key > key:
                 selection = selection.left
             else:
@@ -332,90 +342,80 @@ class AVL:
                 pygame.draw.circle(screen, RED, selection.position, 25, 3)
                 yield None
 
-    def show_duplicate_message(self):
+    def animation_search_for_remove(self, key):
+        if self.root is None:
+            return
+
+        selection = self.root
+        for _ in animation_pause(1):
+            pygame.draw.circle(screen, RED, selection.position, 25, 3)
+            yield None
+
+        while selection is not None:
+            if selection.key == key:
+                for _ in animation_pause(0.8):
+                    pygame.draw.circle(screen, GREEN, selection.position, 25, 5)
+                    yield None
+                break
+            elif selection.key > key:
+                selection = selection.left
+            else:
+                selection = selection.right
+
+            for _ in animation_pause(0.8):
+                pygame.draw.circle(screen, RED, selection.position, 25, 3)
+                yield None
+
+        # Không tồn tại 'key'
+        if selection is None:
+            message = "Không tìm thấy giá trị !"
+            text = font.render(message, True, RED)
+            functor = lambda: screen.blit(text, (WIDTH // 2 - text.get_width() // 2, HEIGHT - 100))
+            animation_queue.append(animation_repeat(2, functor))
+            return
+
+        node_is_leaf = selection.left is None and selection.right is None
+        if node_is_leaf:
+            if selection is self.root:
+                self.root = None
+            else:
+                parent = selection.parent
+                if parent.left is selection:
+                    parent.left = None
+                else:
+                    parent.right = None
+    
+                check_rotate(parent)
+            animation_queue.append(AVL.show_remove_success())
+            return
+
+    def remove(self, key):
+        if self.root is None:
+            return
+
+        animation_queue.append(self.animation_search_for_remove(key))
+
+    def draw(self):
+        draw_root(self.root)
+
+    @staticmethod
+    def show_duplicate_message():
         # Hiển thị thông báo nếu số đã tồn tại
         message = "Số đã tồn tại, vui lòng nhập lại !"
         text_surface = font.render(message, True, RED)
 
-        functor = lambda: screen.blit(text_surface, (WIDTH // 2 - text_surface.get_width() // 2, HEIGHT - 100))
-
-        try:
-            for _ in animation_repeat(3, functor):
-                yield None
-        except:
-            pass
-
-    def animate_node_to_position(self, node, final_x, final_y):
-        """
-        Hiệu ứng di chuyển nút từ vị trí ban đầu đến vị trí cuối cùng.
-        """
-        global delta_time
-
-        step = 25 * delta_time  # Khoảng cách di chuyển mỗi khung hình
-        vec = pygame.Vector2(final_x, final_y) - pygame.Vector2(node.x, node.y)
-        vec = vec.normalize()
-     
-        # screen.fill(WHITE)
-        # self.set_positions(self.root, WIDTH // 2, 50, 250)
-        # self.draw(self.root)
-
-        while node.y < final_y:
-            node.x += vec.x * step
-            node.y += vec.y * step
-            pygame.draw.circle(screen, RED, (node.x, node.y), 20)
-            text = font.render(str(node.key), True, WHITE)
-            screen.blit(text, (node.x - text.get_width() // 2, node.y - text.get_height() // 2))
+        for _ in animation_pause(2):
+            screen.blit(text_surface, (WIDTH // 2 - text_surface.get_width() // 2, HEIGHT - 100))
             yield None
-        
-        node.x, node_y = final_x, final_y
-        yield None
 
-    def delete(self, node, key):
-        if not node:
-            return node
+    @staticmethod
+    def show_remove_success():
+        message = "Xóa thành công !"
+        text_surface = font.render(message, True, RED)
 
-        if key < node.key:
-            node.left = self.delete(node.left, key)
-        elif key > node.key:
-            node.right = self.delete(node.right, key)
-        else:
-            if not node.left:
-                temp = node.right
-                node = None
-                return temp
-            elif not node.right:
-                temp = node.left
-                node = None
-                return temp
-
-            temp = self.min_value_node(node.right)
-            node.key = temp.key
-            node.right = self.delete(node.right, temp.key)
-
-        if not node:
-            return node
-
-        node.update_height()
-        balance = self.get_balance(node)
-
-        if balance > 1 and self.get_balance(node.left) >= 0:
-            return self.right_rotate(node)
-
-        if balance < -1 and self.get_balance(node.right) <= 0:
-            return self.left_rotate(node)
-
-        if balance > 1 and self.get_balance(node.left) < 0:
-            node.left = self.left_rotate(node.left)
-            return self.right_rotate(node)
-
-        if balance < -1 and self.get_balance(node.right) > 0:
-            node.right = self.right_rotate(node.right)
-            return self.left_rotate(node)
-
-        return node
-
-    def draw(self):
-        draw_root(self.root)
+        for _ in animation_pause(2):
+            screen.blit(text_surface, (WIDTH // 2 - text_surface.get_width() // 2, HEIGHT - 100))
+            yield None
 
 tree = AVL()    # type: ignore
 
@@ -600,28 +600,13 @@ if __name__ == '__main__':
 
                 if button_box_delete.collidepoint(event.pos):
                     if delete_value.isdigit():
-                        node_to_delete = tree.search(tree.root, int(delete_value))
-                        if node_to_delete:
-                            tree.root = tree.delete(tree.root, int(delete_value))
-                            delete_message = "Xóa Thành Công"
-                            search_value = ""  # Reset giá trị ô tìm kiếm
-                            tree.found_node = None  # Xoá trạng thái tìm kiếm
-                        else:
-                            delete_message = "Không Tìm Thấy Số Để Xoá"
+                        tree.remove(int(delete_value))
                         delete_value = ""
-                        delete_message_displayed = True
-                        delete_message_time = time.time()
-                        search_message_displayed = False
-                        search_triggered = False
 
                 if button_box_search.collidepoint(event.pos):
                     search_triggered = True
                     if search_value.isdigit():
-                        tree.found_node = tree.search(tree.root, int(search_value))
-                        if tree.found_node:
-                            print(f"{tree.found_node.key}")
-                        else:
-                            print("")
+                        animation_queue.append(tree.animation_search(int(search_value), True))
 
             # Kiểm tra khi nhấn phím trong phần xử lý nhập liệu
             elif event.type == pygame.KEYDOWN:
@@ -671,19 +656,6 @@ if __name__ == '__main__':
                     else:
                         search_value += event.unicode
 
-        # Hiển thị thông báo tìm kiếm
-        if search_triggered:
-            if tree.found_node:
-                pygame.draw.circle(screen, YELLOW, (tree.found_node.x, tree.found_node.y), 25, 5)
-                text_found = font.render("Tìm Thấy", True, BLACK)
-                screen.blit(text_found, (WIDTH // 2 - text_found.get_width() // 2, HEIGHT - 100))
-                search_message_displayed = True
-                search_message_time = time.time()  # Cập nhật thời gian khi tìm thấy
-            else:
-                text_not_found = font.render("Không tìm thấy", True, RED)
-                screen.blit(text_not_found, (WIDTH // 2 - text_not_found.get_width() // 2, HEIGHT - 100))
-                search_message_displayed = True
-                search_message_time = time.time()  # Cập nhật thời gian khi không tìm thấy
 
         # Nếu đã hiển thị thông báo trong quá khứ và thời gian hiện tại đã quá lâu, ẩn thông báo
         if search_message_displayed and (time.time() - search_message_time) > 2:  # 2 giây
