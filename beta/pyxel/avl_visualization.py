@@ -702,9 +702,6 @@ if __name__ == '__main__':
                         if insert_value.isdigit():
                             tree.insert(int(insert_value))
                             insert_value = ""
-                            search_message_displayed = False
-                            search_triggered = False
-                            delete_message_displayed = False
                     else:
                         insert_value += event.unicode
                 elif active_delete:
@@ -712,47 +709,18 @@ if __name__ == '__main__':
                         delete_value = delete_value[:-1]
                     elif event.key == pygame.K_RETURN:  # Nhấn Enter để xóa
                         if delete_value.isdigit():
-                            node_to_delete = tree.search(tree.root, int(delete_value))
-                            if node_to_delete:
-                                tree.root = tree.delete(tree.root, int(delete_value))
-                                delete_message = "Xóa Thành Công"
-                                search_value = ""  # Reset giá trị ô tìm kiếm
-                                tree.found_node = None  # Xoá trạng thái tìm kiếm
-                            else:
-                                delete_message = "Không Tìm Thấy Số Để Xoá"
-                        delete_value = ""  # Reset ô nhập liệu sau khi xóa
-                        delete_message_displayed = True
-                        delete_message_time = time.time()  # Cập nhật thời gian hiển thị thông báo
-                        search_message_displayed = False
-                        search_triggered = False
-                    else:delete_value += event.unicode
+                            tree.remove(int(delete_value))
+                            delete_value = ""
+                    else:
+                        delete_value += event.unicode
                 elif active_search:
                     if event.key == pygame.K_BACKSPACE:
                         search_value = search_value[:-1]
                     elif event.key == pygame.K_RETURN:  # Nhấn Enter để tìm kiếm
                         if search_value.isdigit():
-                            tree.found_node = tree.search(tree.root, int(search_value))
-                            if tree.found_node:
-                                print(f"{tree.found_node.key}")
-                            else:
-                                print("Không tìm thấy")
-                        delete_message_displayed = False
-                        search_triggered = True
+                            animation_queue.append(tree.animation_search(int(search_value), True))
                     else:
                         search_value += event.unicode
-
-
-        # Nếu đã hiển thị thông báo trong quá khứ và thời gian hiện tại đã quá lâu, ẩn thông báo
-        if search_message_displayed and (time.time() - search_message_time) > 2:  # 2 giây
-            search_message_displayed = False
-            search_triggered = False
-
-        if delete_message_displayed:
-            delete_text = font.render(delete_message, True, BLACK if delete_message == "Xóa Thành Công" else RED)
-            screen.blit(delete_text, (WIDTH // 2 - delete_text.get_width() // 2, HEIGHT - 100))
-
-        if delete_message_displayed and (time.time() - delete_message_time) > 2:  # 2 giây
-            delete_message_displayed = False
 
         pygame.display.flip()
         delta_time = clock.tick(60) / 1000
