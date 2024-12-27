@@ -285,7 +285,7 @@ class AVL:
 
         # Thông báo : nhập giá trị đã tồn tại
         if self.search(key):
-            animation_queue.append(AVL.show_duplicate_message())
+            animation_queue.append(self.show_duplicate_message())
             return
 
         # Thêm nút
@@ -340,7 +340,6 @@ class AVL:
                     for _ in animation_pause(1):
                         screen.blit(text, Vector2(WIDTH // 2 - text.get_width() // 2, HEIGHT - 100))
                         yield None
-
                 return
 
             elif selection.key > key:
@@ -348,9 +347,17 @@ class AVL:
             else:
                 selection = selection.right
 
-            for _ in animation_pause(0.8):
-                pygame.draw.circle(screen, RED, selection.position, 25, 3)
-                yield None
+            if selection is not None:
+                for _ in animation_pause(0.8):
+                    pygame.draw.circle(screen, RED, selection.position, 25, 3)
+                    yield None
+
+        message = "Không tìm thấy !"
+        text = font.render(message, True, RED)
+
+        for _ in animation_pause(1):
+            screen.blit(text, Vector2(WIDTH // 2 - text.get_width() // 2, HEIGHT - 100))
+            yield None
 
     def animation_search_for_remove(self, key):
         if self.root is None:
@@ -373,9 +380,10 @@ class AVL:
             else:
                 selection = selection.right
 
-            for _ in animation_pause(0.8):
-                pygame.draw.circle(screen, RED, selection.position, 25, 3)
-                yield None
+            if selection is not None:
+                for _ in animation_pause(0.8):
+                    pygame.draw.circle(screen, RED, selection.position, 25, 3)
+                    yield None
 
         # Không tồn tại 'key'
         if selection is None:
@@ -404,7 +412,7 @@ class AVL:
                     parent.right = None
 
                 check_rotate(parent)    # Balancing
-            animation_queue.append(AVL.show_remove_success())
+            animation_queue.append(self.show_remove_success())
             return
 
         # Case : node have two subtree
@@ -463,7 +471,7 @@ class AVL:
             check_rotate(subtree)
         else:
             check_rotate(parent)
-        animation_queue.append(AVL.show_remove_success())
+        animation_queue.append(self.show_remove_success())
 
     def remove(self, key):
         if self.root is None:
@@ -475,8 +483,7 @@ class AVL:
         draw_branch(self.root)
         draw_root(self.root)
 
-    @staticmethod
-    def show_duplicate_message():
+    def show_duplicate_message(self):
         # Hiển thị thông báo nếu số đã tồn tại
         message = "Số đã tồn tại, vui lòng nhập lại !"
         text_surface = font.render(message, True, RED)
@@ -485,8 +492,7 @@ class AVL:
             screen.blit(text_surface, (WIDTH // 2 - text_surface.get_width() // 2, HEIGHT - 100))
             yield None
 
-    @staticmethod
-    def show_remove_success():
+    def show_remove_success(self):
         message = "Xóa thành công !"
         text_surface = font.render(message, True, RED)
 
