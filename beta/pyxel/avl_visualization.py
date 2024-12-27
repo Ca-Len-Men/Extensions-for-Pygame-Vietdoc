@@ -215,16 +215,26 @@ def draw_root(root):
     text = font.render(str(root.key), True, WHITE)
     screen.blit(text, root.position - Vector2(text.get_width() // 2, text.get_height() // 2))
 
-    balance_text = font.render(f"{root.height}", True, BLACK)
+    balance_text = font.render(f"{balance}", True, BLACK)
     screen.blit(balance_text, root.position + Vector2(-balance_text.get_width() // 2, 25))
 
     if root.left:
-            pygame.draw.line(screen, BLACK, root.position, root.left.position, 2)
             draw_root(root.left)
             
     if root.right:
-            pygame.draw.line(screen, BLACK, root.position, root.right.position, 2)
             draw_root(root.right)
+
+def draw_branch(root):
+    if root is None:
+        return
+
+    if root.left:
+        pygame.draw.line(screen, BLACK, root.position, root.left.position, 2)
+        draw_branch(root.left)
+
+    if root.right:
+        pygame.draw.line(screen, BLACK, root.position, root.right.position, 2)
+        draw_branch(root.right)
 
 def animation_move(nodes, positions):
     speed = 600
@@ -351,6 +361,7 @@ class AVL:
             pygame.draw.circle(screen, RED, selection.position, 25, 3)
             yield None
 
+        # Tìm kiếm
         while selection is not None:
             if selection.key == key:
                 for _ in animation_pause(0.8):
@@ -374,20 +385,85 @@ class AVL:
             animation_queue.append(animation_repeat(2, functor))
             return
 
-        node_is_leaf = selection.left is None and selection.right is None
-        if node_is_leaf:
-            if selection is self.root:
+        # Xóa nút không phải lá
+        animation_queue.append(self.animation_for_remove(selection))
+
+    def animation_for_remove(self, node):
+        have_left_subtree = node.left is not None
+        have_right_subtree = node.right is not None
+
+        # Case : node is leaf
+        if have_left_subtree is False and have_right_subtree is False:
+            if node is self.root:   # Remove root
                 self.root = None
-            else:
-                parent = selection.parent
-                if parent.left is selection:
+            else:                   # Remove leaf
+                parent = node.parent
+                if parent.left is node:
                     parent.left = None
                 else:
                     parent.right = None
-    
-                check_rotate(parent)
+
+                check_rotate(parent)    # Balancing
             animation_queue.append(AVL.show_remove_success())
             return
+
+        # Case : node have two subtree
+        if have_left_subtree and have_right_subtree:
+            # Tìm min|max tại 'node' để thế chỗ
+            # (!) : Mặc định tìm bên phải để xóa nếu nút bị xóa có hai con
+
+            select = node.right
+            for _ in animation_pause(1):
+                pygame.draw.circle(screen, RED, select.position, 25, 3)
+                yield None
+
+            while True:
+                if select.left is None:
+                    break
+                select = select.left
+                for _ in animation_pause(1):
+                    pygame.draw.circle(screen, RED, select.position, 25, 3)
+                    yield None
+
+            # Tìm thấy nút thế thân, khoanh tròn màu GREEN
+            for _ in animation_pause(1):
+                pygame.draw.circle(screen, GREEN, select.position, 25, 3)
+                yield None
+
+            # Thay thế
+            node.key = select.key
+            # Tiếp tục animtion xóa 'select'
+            animation_queue.append(self.animation_for_remove(select))
+            return
+
+        # Case : node have one subtree
+        parent = node.parent
+        subtree = node.left if have_left_subtree else node.right
+        subtree.parent = parent
+        if node is self.root:
+            self.root = subtree
+        elif parent.left is node:
+            parent.left = subtree
+        else:
+            parent.right = subtree
+        if parent is not None:
+            parent.update_height()
+
+        # Di chuyển cây con về vị trí
+        nodes = []
+        subtree._make_nodes(nodes)
+        positions = list((node.get_position(Vector2(WIDTH // 2, 50), 350) for node in nodes))
+
+        # Animation rorate left
+        for _ in animation_move(nodes, positions):
+            yield None
+
+        # Balancing
+        if self.root is subtree:
+            check_rotate(subtree)
+        else:
+            check_rotate(parent)
+        animation_queue.append(AVL.show_remove_success())
 
     def remove(self, key):
         if self.root is None:
@@ -396,6 +472,7 @@ class AVL:
         animation_queue.append(self.animation_search_for_remove(key))
 
     def draw(self):
+        draw_branch(self.root)
         draw_root(self.root)
 
     @staticmethod
@@ -434,19 +511,22 @@ def check_rotate(node):
     balance = node.get_balance()
 
     if balance > 1:     # Lệch trái
-        node_right_height = 0 if node.right is None else node.right.height
-        if node.left.right is not None and node.left.right.height > node_right_height:  # Cây con trái lệch phải
+        if node.left.get_balance() == -1:  # Cây con trái lệch phải
             animation_queue.append(animation_rotate_left(node.left, False))
         animation_queue.append(animation_rotate_right(node, True))
     elif balance < -1:  # Lệch phải
-        node_left_height = 0 if node.left is None else node.left.height
-        if node.right.left is not None and node.right.left.height > node_left_height:  # Cây con phải lệch trái
+        if node.right.get_balance() == 1:  # Cây con phải lệch trái
             animation_queue.append(animation_rotate_right(node.right, False))
         animation_queue.append(animation_rotate_left(node, True))
     elif node.parent is not None:
         check_rotate(node.parent)
 
 def animation_rotate_right(node, on_top):
+    text = font.render("Xoay phải", True, BLACK)
+    for _ in animation_pause(1):
+        screen.blit(text, node.position + Vector2(-text.get_width() // 2, -30))
+        yield None
+
     node = node.rotate_right()
     node.update_height()
     if node.parent is None:
@@ -467,6 +547,11 @@ def animation_rotate_right(node, on_top):
     yield None
 
 def animation_rotate_left(node, on_top):
+    text = font.render("Xoay trái", True, BLACK)
+    for _ in animation_pause(1):
+        screen.blit(text, node.position + Vector2(-text.get_width() // 2, -30))
+        yield None
+
     node = node.rotate_left()
     node.update_height()
     if node.parent is None:
@@ -501,7 +586,7 @@ input_box_delete = pygame.Rect(400, HEIGHT - 60, 160, 40)
 button_box_delete = pygame.Rect(580, HEIGHT - 60, 100, 40)
 
 input_box_search = pygame.Rect(750, HEIGHT - 60, 160, 40)
-button_box_search = pygame.Rect(930, HEIGHT - 60, 100, 40)
+button_box_search = pygame.Rect(930, HEIGHT - 60, 140, 40)
 
 active_insert = False
 active_delete = False
